@@ -2,11 +2,24 @@
 * {
   margin: 0;
   padding: 0;
-  
+}
+
+#canva {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-color: #F0F8FF;
+}
+
+#scrolled {
+  height: 200vh;
+  margin: 20px;
 }
 
 button {
-  background-color: #081f2d;
   border-radius: 29px;
   border: 1px solid #081F2D;
   color: #fff;
@@ -17,53 +30,34 @@ button {
   margin-right: 5px;
 }
 
-.remove-btn {
-  background-color: red;
-  padding: 10px 14px;
-  
+button.primary {
+  background-color: #081f2d;
 }
 
-input {
-  border-radius: 29px;
-  border: 1px solid #081F2D;
-  padding: 10px 25px;
-  font-size: 15px;
-  width: 50px;
+button.apply {
+  background-color: green;
 }
+
+button.remove {
+  padding: 10px 14px;
+  background-color: red;
+}
+
 
 button:hover {
   background-color: #fff;
+}
+
+button.primary:hover {
   color: #081F2D;
-  border-color: #081F2D;
-  transition: 0.3s;
 }
 
-.remove-btn:hover {
-  background-color: #fff;
+button.apply:hover {
+  color: green;
+}
+
+button.remove:hover {
   color: red;
-}
-
-.wrapper {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  background-color: #F0F8FF;
-}
-.scrolled {
-  height: 200vh;
-  margin: 20px;
-}
-
-span.line {
-  position: absolute;
-  display: block;
-  width: 4px;
-  background: rgb(2,0,36);
-  transition: opacity 0.3s ease-out;
-  animation: gradientAnimation .5s ease-out infinite;
 }
 
 .form-group {
@@ -84,9 +78,22 @@ span.line {
   margin-left: 10px;
 }
 
+input {
+  border-radius: 29px;
+  border: 1px solid #081F2D;
+  padding: 10px 25px;
+  font-size: 15px;
+  width: 50px;
+}
 
-
-
+span.line {
+  position: absolute;
+  display: block;
+  width: 4px;
+  background: rgb(2,0,36);
+  transition: opacity 0.3s ease-out;
+  animation: gradientAnimation .5s ease-out infinite;
+}
 
 @keyframes gradientAnimation {
   0% {
@@ -106,11 +113,11 @@ span.line {
   }
 }
 
-#canvas {
+/* #canvas {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   border: 1px solid black;
-}
+} */
