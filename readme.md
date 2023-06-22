@@ -1,4 +1,5 @@
 # StringArt
+[Live example](https://skcorpion.github.io/js_string-art/)
 
 **Tier:** 2-Intermediate
 
