@@ -16,11 +16,47 @@ function newInterval(line, ms, id) {
   return (id = setInterval(line, ms));
 }
 
-const canva = document.querySelector("#canva");
+function calculateSideCoordinates(xMid, yMid, height, angle) {
+  const angleRadians = (angle * Math.PI) / 180;
+  const halfHeight = height / 2;
+
+  const dx = halfHeight * Math.cos(angleRadians);
+  const dy = halfHeight * Math.sin(angleRadians);
+
+  const x1 = xMid - dx;
+  const y1 = yMid - dy;
+  const x2 = xMid + dx;
+  const y2 = yMid + dy;
+
+  return [x1, y1, x2, y2];
+}
+
+function createGradient(ctx, posObj, opacity) {
+  const { x1, y1, x2, y2 } = posObj;
+  const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+  gradient.addColorStop(0, `rgba(2,0,36,${opacity})`);
+  gradient.addColorStop(0.5, `rgba(93,93,152,${opacity})`);
+  gradient.addColorStop(1, `rgba(0,212,255,${opacity})`);
+
+  return gradient;
+}
+
+function drawLine(ctx, posObj, opacity) {
+  const { x1, y1, x2, y2 } = posObj;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = createGradient(ctx, posObj, opacity);
+  ctx.stroke();
+}
+
+const canvasContainer = document.querySelector("#canvas-container");
 const scrolled = document.querySelector("#scrolled");
 const newLineBtn = document.querySelector("#add-line");
 
 class Line {
+  canvas = null;
+  ctx = null;
   canvaSize = {
     height: null,
     width: null,
@@ -30,11 +66,14 @@ class Line {
     recent: null,
   };
   lineParams = {
-    angle: getRandomNumber(0, 359),
+    angle: {
+      current: null,
+      next: getRandomNumber(0, 359),
+    },
     height: 200,
-    posX: null,
-    posY: null,
-    rotateDirection: 10,
+    xMid: null,
+    yMid: null,
+    rotateDirection: 5,
     direction: {
       x: getRandomNumber(-10, 10),
       y: getRandomNumber(-10, 10),
@@ -43,10 +82,12 @@ class Line {
   };
   linesCollection = new Map();
 
-
   _updateBoundSide = (side) => {
-    this.canvaSideBoundState.last = this.canvaSideBoundState.recent;
-    this.canvaSideBoundState.recent = side;
+    const { recent } = this.canvaSideBoundState;
+    this.canvaSideBoundState = {
+      last: recent,
+      recent: side,
+    };
   };
 
   _reverseDirection = (boundAxis, perpendicularAxis) => {
@@ -59,58 +100,69 @@ class Line {
 
   height = (number) => {
     this.lineParams.height = number;
-  }
+  };
 
   remove = () => {
-    for (let [key, value] of this.linesCollection) {
-      value.lineRef.remove();
-      this.linesCollection.delete(key);
-    }
+    this.canvas.remove();
   };
 
   oneFrame = () => {
+    this.lineParams.angle.current = this.lineParams.angle.next;
     let bound = false;
-    // define the canva size
-    this.canvaSize.height = canva.clientHeight;
-    this.canvaSize.width = canva.clientWidth;
+    // define the canva & context
+    if (this.canvas === null) {
+      this.canvas = document.createElement("canvas");
+      canvasContainer.append(this.canvas);
+      this.ctx = this.canvas.getContext("2d");
+    }
 
-    // spawn the line
-    const line = document.createElement("span");
-    line.className = "line";
-    line.style.transform = `rotate(${this.lineParams.angle}deg)`;
-    line.style.height = this.lineParams.height + "px";
-    canva.append(line);
+    // define the canva size
+    this.canvas.width = this.canvas.offsetWidth;
+    this.canvas.height = this.canvas.offsetHeight;
+    this.ctx.lineWidth = 5;
 
     // define the canva boundries
-    const lineCalcParams = line.getBoundingClientRect();
     const canvaBoundries = {
-      left: -Math.floor((line.offsetWidth - lineCalcParams.width) / 2),
-      top: -Math.floor((line.offsetHeight - lineCalcParams.height) / 2),
-      right: Math.floor(
-        this.canvaSize.width - (lineCalcParams.width + line.offsetWidth) / 2
-      ),
-      bottom: Math.floor(
-        this.canvaSize.height - (lineCalcParams.height + line.offsetHeight) / 2
-      ),
+      left: 0,
+      top: 0,
+      right: this.canvas.width,
+      bottom: this.canvas.height,
     };
 
+    const defineCanvaBoundries = () => {
+      let [x1, y1] = calculateSideCoordinates(
+        0,
+        0,
+        this.lineParams.height,
+        this.lineParams.angle.current
+      );
+      x1 = Math.abs(x1);
+      y1 = Math.abs(y1);
+
+      canvaBoundries.right -= x1;
+      canvaBoundries.left += x1;
+
+      canvaBoundries.bottom -= y1;
+      canvaBoundries.top += y1;
+    };
+    defineCanvaBoundries();
+
     // random spawn
-    if (this.lineParams.posX === null && this.lineParams.posY === null) {
-      this.lineParams.posX = getRandomNumber(
+    if (this.lineParams.xMid === null && this.lineParams.yMid === null) {
+      this.lineParams.xMid = getRandomNumber(
         canvaBoundries.left,
         canvaBoundries.right
       );
-      this.lineParams.posY = getRandomNumber(
+      this.lineParams.yMid = getRandomNumber(
         canvaBoundries.top,
         canvaBoundries.bottom
       );
     } else {
       // moving logic
-      let tempX = this.lineParams.posX + this.lineParams.direction.x;
-      let tempY = this.lineParams.posY + this.lineParams.direction.y;
-
+      let tempX = this.lineParams.xMid + this.lineParams.direction.x;
+      let tempY = this.lineParams.yMid + this.lineParams.direction.y;
       // check the X bounds
-      if (tempX <= canvaBoundries.left - 1) {
+      if (tempX < canvaBoundries.left) {
         this._updateBoundSide("left");
         [this.lineParams.direction.x, this.lineParams.direction.y] =
           this._reverseDirection(
@@ -119,9 +171,9 @@ class Line {
           );
 
         tempX = canvaBoundries.left;
-        tempY = this.lineParams.posY + this.lineParams.direction.y;
+        tempY = this.lineParams.yMid + this.lineParams.direction.y;
         bound = true;
-      } else if (tempX >= canvaBoundries.right - 1) {
+      } else if (tempX > canvaBoundries.right) {
         this._updateBoundSide("right");
         [this.lineParams.direction.x, this.lineParams.direction.y] =
           this._reverseDirection(
@@ -130,12 +182,12 @@ class Line {
           );
 
         tempX = canvaBoundries.right;
-        tempY = this.lineParams.posY + this.lineParams.direction.y;
+        tempY = this.lineParams.yMid + this.lineParams.direction.y;
         bound = true;
       }
 
       // check the Y bounds
-      if (tempY <= canvaBoundries.top - 1) {
+      if (tempY < canvaBoundries.top) {
         this._updateBoundSide("top");
         [this.lineParams.direction.y, this.lineParams.direction.x] =
           this._reverseDirection(
@@ -143,10 +195,10 @@ class Line {
             this.lineParams.direction.x
           );
 
-          tempY = canvaBoundries.top;
-          tempX = this.lineParams.posX + this.lineParams.direction.x;
-          bound = true;
-      } else if (tempY >= canvaBoundries.bottom - 1) {
+        tempY = canvaBoundries.top;
+        tempX = this.lineParams.xMid + this.lineParams.direction.x;
+        bound = true;
+      } else if (tempY > canvaBoundries.bottom) {
         this._updateBoundSide("bottom");
         [this.lineParams.direction.y, this.lineParams.direction.x] =
           this._reverseDirection(
@@ -154,48 +206,62 @@ class Line {
             this.lineParams.direction.x
           );
 
-          tempY = canvaBoundries.bottom;
-          tempX = this.lineParams.posX + this.lineParams.direction.x;
-          bound = true;
+        tempY = canvaBoundries.bottom;
+        tempX = this.lineParams.xMid + this.lineParams.direction.x;
+        bound = true;
       }
 
       // update position
-      this.lineParams.posX = tempX;
-      this.lineParams.posY = tempY;
-
-      // change rotation
-      if (
-        this.canvaSideBoundState.last !== this.canvaSideBoundState.recent &&
-        bound
-      ) {
-        this.lineParams.rotateDirection = -this.lineParams.rotateDirection;
-      }
-      this.lineParams.angle += this.lineParams.rotateDirection;
-      if (this.lineParams.angle > 359) this.lineParams.angle = 0;
-      if (this.lineParams.angle < 0) this.lineParams.angle = 359;
+      this.lineParams.xMid = tempX;
+      this.lineParams.yMid = tempY;
     }
 
-    line.style.left = this.lineParams.posX + "px";
-    line.style.top = this.lineParams.posY + "px";
+    // change rotation
+    if (
+      this.canvaSideBoundState.last !== this.canvaSideBoundState.recent &&
+      bound
+    ) {
+      this.lineParams.rotateDirection = -this.lineParams.rotateDirection;
+    }
+    this.lineParams.angle.next += this.lineParams.rotateDirection;
+    if (this.lineParams.angle.next > 359) this.lineParams.angle.next = 0;
+    if (this.lineParams.angle.next < 0) this.lineParams.angle.next = 359;
 
-    // update collection
+    // draw new line
+    const [x1, y1, x2, y2] = calculateSideCoordinates(
+      this.lineParams.xMid,
+      this.lineParams.yMid,
+      this.lineParams.height,
+      this.lineParams.angle.current
+    )
+    drawLine(
+      this.ctx,
+      { x1, y1, x2, y2 },
+      1
+    );
+    // draw all lines in collection
     for (let [key, value] of this.linesCollection) {
       value.timer -= 1;
-      value.lineRef.style.opacity =
-        (1 / this.lineParams.retainingImages) * value.timer;
       if (value.timer <= 0) {
-        value.lineRef.remove();
         this.linesCollection.delete(key);
+      } else {
+        const opacity = (1 / this.lineParams.retainingImages) * value.timer;
+        const { x1, y1, x2, y2 } = value.lineCoords;
+        drawLine(this.ctx, { x1, y1, x2, y2 }, opacity);
       }
     }
-
+    // update collection
     this.linesCollection.set(generateRandomKey(), {
-      lineRef: line,
+      lineCoords: {
+        x1,
+        y1,
+        x2,
+        y2,
+      },
       timer: this.lineParams.retainingImages,
     });
   };
 }
-
 
 let activeLines = 0;
 newLineBtn.addEventListener("click", () => {
@@ -204,7 +270,10 @@ newLineBtn.addEventListener("click", () => {
 
   // start
   const line = new Line();
-  let intervalId = setInterval(line.oneFrame, 50);
+  const lineHeight = getRandomNumber(100, 200);
+  const lineVelocity = getRandomNumber(20, 50)
+  line.height(lineHeight)
+  let intervalId = setInterval(line.oneFrame, lineVelocity);
 
   // add control
   scrolled.insertAdjacentHTML(
@@ -213,11 +282,11 @@ newLineBtn.addEventListener("click", () => {
   <form class='form-group' id="f${lineNumber}">
     <div class="input-row">
       <label for="l${lineNumber}length">length (px)</label>
-      <input type="number" id="l${lineNumber}length" name="l${lineNumber}length" value="200" min="100" max="400">
+      <input type="number" id="l${lineNumber}length" name="l${lineNumber}length" value="${lineHeight}" min="100" max="300">
     </div>
     <div class="input-row">
       <label for="l${lineNumber}velocity">velosity (ms)</label>
-      <input type="number" id="l${lineNumber}velocity" name="l${lineNumber}velocity" value="50">
+      <input type="number" id="l${lineNumber}velocity" name="l${lineNumber}velocity" value="${lineVelocity}" min="20" max="50">
     </div>
     <button id="l${lineNumber}btn" class="apply">Apply</button>
     <button id="l${lineNumber}btn-remove" class="remove">X</button>
@@ -229,14 +298,14 @@ newLineBtn.addEventListener("click", () => {
   const applyBtn = document.querySelector(`#l${lineNumber}btn`);
   applyBtn.addEventListener("click", (event) => {
     event.preventDefault();
-    const lineLength = parseFloat(
+    const lineHeight = parseFloat(
       document.querySelector(`#l${lineNumber}length`).value
     );
     const lineVelocity = parseFloat(
       document.querySelector(`#l${lineNumber}velocity`).value
     );
     intervalId = newInterval(line.oneFrame, lineVelocity, intervalId);
-    line.height(lineLength);
+    line.height(lineHeight);
   });
 
   // remove button
